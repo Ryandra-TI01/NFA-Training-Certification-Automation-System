@@ -261,10 +261,10 @@ In Progress
 | Category | Technology |
 |----------|------------|
 | Workflow Engine | n8n |
-| Database | Supabase |
-| Email | SMTP |
+| Database | Airtable |
+| Email | Node Gmail |
 | Scheduling | Cron |
-| Reporting | Email Summary |
+| Reporting | Telegram |
 
 ---
 
