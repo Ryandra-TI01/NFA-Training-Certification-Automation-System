@@ -1,116 +1,231 @@
-# NFA Training & Certification Automation System
+# Quiz Submission
 
-An end-to-end workflow automation project developed as the final project for the **AI for Business Independent Study Program** at **NF Academy**.
+This branch contains the workflow responsible for processing employee quiz submissions and automatically generating training certificates.
 
-This project demonstrates how business processes in employee training and certification can be automated using **n8n**, reducing manual administrative work while improving process consistency and operational efficiency.
-
----
-
-## Overview
-
-The system automates the complete employee training lifecycle, including:
-
-- Automatic training assignment
-- Learning material distribution
-- Scheduled quiz release
-- Reminder automation
-- Quiz submission processing
-- Certificate generation
-- HR reporting
-
-The implementation is separated into multiple workflows to improve maintainability and scalability.
+The workflow is triggered whenever a participant submits a completed quiz through **Tally**. It validates the submission, evaluates the participant's score, updates the training assignment status, generates certificates for successful participants, and sends the final evaluation via email.
 
 ---
 
-## Repository Structure
+## Workflow Overview
 
 ```
-NFA-Training-Certification-Automation-System
-│
-├── main
-│   └── README.md
-│
-├── training-automation
-│   ├── README.md
-│   ├── flow1-training-auto-assignment.json
-│   └── flow2-quiz-release-reminder.json
-│
-└── quiz-submission
-    ├── README.md
-    └── flow3-quiz-submission.json
+Tally Submission
+        │
+        ▼
+Validate Assignment
+        │
+        ▼
+Retrieve Employee Data
+        │
+        ▼
+Retrieve Training Module
+        │
+        ▼
+Evaluate Quiz Score
+        │
+        ├──────────────► Failed
+        │                    │
+        │                    ▼
+        │             Update Assignment
+        │                    │
+        │                    ▼
+        │            Send Evaluation Email
+        │
+        ▼
+Passed
+        │
+        ▼
+Generate Certificate
+        │
+        ▼
+Save Certificate URL
+        │
+        ▼
+Update Assignment
+        │
+        ▼
+Send Certificate Email
 ```
 
 ---
 
-## Branches
+# Objective
 
-| Branch | Description |
-|----------|-------------|
-| `main` | Project overview and repository documentation |
-| `training-automation` | Training Auto-Assignment and Quiz Release & Reminder workflows |
-| `quiz-submission` | Quiz submission processing, certificate generation, and evaluation workflow |
+Automatically process quiz submissions, determine participant eligibility based on the passing score, and issue digital certificates for employees who successfully complete mandatory training.
 
 ---
 
-## Technology Stack
+# Business Process
+
+1. Receive quiz submission from Tally.
+2. Validate the submitted assignment.
+3. Retrieve employee information.
+4. Retrieve the associated training module.
+5. Compare the participant's score against the module passing score.
+6. Update assignment status.
+7. Generate a PDF certificate for successful participants.
+8. Store the certificate URL.
+9. Send the final evaluation email.
+
+---
+
+# Workflow
+
+```
+Webhook (Tally)
+        │
+        ▼
+Validate Assignment
+        │
+        ▼
+Load Employee
+        │
+        ▼
+Load Training Module
+        │
+        ▼
+Compare Score
+        │
+        ├──────────────► Score < Passing Score
+        │                    │
+        │                    ▼
+        │             Update Status = Failed
+        │                    │
+        │                    ▼
+        │            Send Failure Email
+        │
+        ▼
+Score ≥ Passing Score
+        │
+        ▼
+Generate Certificate
+        │
+        ▼
+Upload Certificate
+        │
+        ▼
+Save Certificate URL
+        │
+        ▼
+Update Status = Completed
+        │
+        ▼
+Send Certificate Email
+```
+
+---
+
+# Functional Requirements
+
+| ID | Description |
+|----|-------------|
+| FR-15 | Receive quiz submissions from Tally. |
+| FR-16 | Validate the submitted assignment. |
+| FR-17 | Retrieve employee, training module, and assignment information. |
+| FR-18 | Compare participant score with the module passing score. |
+| FR-19 | Mark assignment as **Completed** when the participant passes. |
+| FR-20 | Generate a PDF certificate automatically. |
+| FR-21 | Store the certificate URL in the assignment record. |
+| FR-22 | Send a completion email with the generated certificate. |
+| FR-23 | Mark assignment as **Failed** when the participant does not meet the passing score. |
+| FR-24 | Send the final evaluation email for unsuccessful participants. |
+
+---
+
+# Assignment State Transition
+
+```
+In Progress
+      │
+      ▼
+Quiz Submitted
+      │
+      ├──────────────► Passed
+      │                    │
+      │                    ▼
+      │              Completed
+      │
+      └──────────────► Failed
+```
+
+---
+
+# Output
+
+## Successful Submission
+
+The workflow performs the following actions:
+
+- Updates assignment status to **Completed**
+- Generates a PDF certificate
+- Saves the certificate URL
+- Sends the certificate via email
+
+---
+
+## Failed Submission
+
+The workflow performs the following actions:
+
+- Updates assignment status to **Failed**
+- Records participant score
+- Sends an evaluation email
+
+---
+
+# Technology Stack
 
 | Category | Technology |
 |----------|------------|
-| Workflow Automation | n8n |
+| Workflow Engine | n8n |
+| Form Platform | Tally |
 | Database | Airtable |
-| Form Submission | Tally |
-| Document Generation | PDFMonkey |
-| Notification | Email |
-| Notification | Telegram |
-| Reporting | PDF |
+| PDF Generation | PDFMonkey |
+| Email | Node Gmail |
 
 ---
 
-## Workflow Summary
+# Repository Structure
 
-### Training Automation
-
-Automates employee training assignments based on role, distributes learning materials, releases quizzes, and manages reminder notifications until completion.
-
-### Quiz Submission
-
-Processes quiz submissions, validates scores, updates training status, generates completion certificates, and delivers evaluation results automatically.
-
----
-
-## Key Features
-
-- Automated employee training assignment
-- Scheduled quiz distribution
-- Reminder workflow
-- Quiz evaluation
-- Automatic certificate generation
-- HR reporting
-- Workflow orchestration using n8n
-- Database integration with Airtable
+```
+quiz-submission
+│
+├── README.md
+└── flow3-quiz-submission.json
+```
 
 ---
 
-## Project Goals
+# Integration
 
-- Reduce repetitive administrative tasks
-- Standardize employee training processes
-- Improve monitoring and reporting
-- Increase workflow reliability through automation
-- Demonstrate practical implementation of business process automation
+This workflow is designed to work together with the **training-automation** branch.
+
+The overall automation process is divided into two stages:
+
+```
+training-automation
+│
+├── Flow 1 — Training Auto Assignment
+└── Flow 2 — Quiz Release & Reminder
+                │
+                ▼
+quiz-submission
+│
+└── Flow 3 — Quiz Submission
+        │
+        ▼
+Certificate Generation
+```
 
 ---
 
-## License
+# Notes
 
-This repository was developed for educational and portfolio purposes as part of the **AI for Business Independent Study Program** at **NF Academy**.
+This workflow assumes that:
 
----
+- Training assignments have already been created.
+- Quiz invitations have already been sent.
+- Participants access quizzes through Tally.
+- Assignment and employee data are stored in Supabase.
 
-## Author
-
-**Ryandra Athaya Saleh**
-
-Software Engineering Student
-
-Backend Development • Workflow Automation • Business Process Automation
+The workflow focuses exclusively on submission processing, evaluation, and certificate generation.
