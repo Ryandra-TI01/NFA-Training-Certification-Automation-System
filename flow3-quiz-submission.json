@@ -1,0 +1,1111 @@
+{
+  "name": "Flow 3 — Quiz Submission & Certificated Released",
+  "nodes": [
+    {
+      "parameters": {
+        "formId": "obvaKO"
+      },
+      "type": "n8n-nodes-tallyforms.tallyTrigger",
+      "typeVersion": 2,
+      "position": [
+        160,
+        -384
+      ],
+      "id": "f96558f9-6c7f-4f56-9892-6e051128e4a9",
+      "name": "Tally Trigger",
+      "webhookId": "2e6db46c-4c53-4d56-b92a-5c99578303ff",
+      "credentials": {
+        "tallyApi": {
+          "id": "kGHfY7Z4MnB7PBdu",
+          "name": "Tally Ryand"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function formatDateWIB(date) {\n  const wib = new Date(date.getTime() + (7 * 60 * 60 * 1000));\n  const days   = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];\n  const months = ['Januari','Februari','Maret','April','Mei','Juni',\n                  'Juli','Agustus','September','Oktober','November','Desember'];\n  return `${days[wib.getUTCDay()]}, ${wib.getUTCDate()} ${months[wib.getUTCMonth()]} ${wib.getUTCFullYear()}`;\n}\n\n// ======================\n// HELPER: bersihin BOM (U+FEFF) dari string apa pun\n// ======================\nfunction stripBOM(str) {\n  if (typeof str !== 'string') return str;\n  return str.replace(/^\\uFEFF/, '').trim();\n}\n\nconst result = {};\nfor (const [key, value] of Object.entries($json)) {\n  if (\n    typeof value === \"object\" &&\n    value !== null &&\n    value.label &&\n    value.value !== undefined\n  ) {\n    const cleanLabel = stripBOM(value.label);\n    result[cleanLabel] = value.value;\n  }\n}\n\nresult.submission_id = $json.id;\nresult.submitted_at = $json.createdAt;\nresult.submitted_at_display = formatDateWIB(new Date(result.submitted_at));\n\nreturn [{ json: result }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        -384
+      ],
+      "id": "bc663598-d418-4ccb-84f0-279eba4870c3",
+      "name": "Normalize Payload"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1a3c7114-54cb-426f-8b09-55d950c87934",
+              "leftValue": "={{ $json.fields.status }}",
+              "rightValue": "Completed",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "id": "ec296156-9901-4256-add3-b05732fce4be",
+              "leftValue": "={{ $json.fields.assignment_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        736,
+        -384
+      ],
+      "id": "d19d086f-cf51-462c-b66c-e4677ba29c0a",
+      "name": "Validate Assignment"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "app5Z9SJVYsn81W2A",
+          "mode": "list",
+          "cachedResultName": "final-proyek-nfa",
+          "cachedResultUrl": "https://airtable.com/app5Z9SJVYsn81W2A"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl1IaQc5FCVwxKYT",
+          "mode": "list",
+          "cachedResultName": "employees",
+          "cachedResultUrl": "https://airtable.com/app5Z9SJVYsn81W2A/tbl1IaQc5FCVwxKYT"
+        },
+        "filterByFormula": "={employee_id}  = '{{ $json.fields[\"employee_id (from employee_id)\"] }}'",
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        -400
+      ],
+      "id": "5e3fa565-6427-4055-8439-0b0fd5b78488",
+      "name": "Get Employee",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "fgT90T4Sh3ZIkv2X",
+          "name": "Airtable Personal Access Token account 2 - copy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "app5Z9SJVYsn81W2A",
+          "mode": "list",
+          "cachedResultName": "final-proyek-nfa",
+          "cachedResultUrl": "https://airtable.com/app5Z9SJVYsn81W2A"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblfwFob7kxowCKER",
+          "mode": "list",
+          "cachedResultName": "training_modules",
+          "cachedResultUrl": "https://airtable.com/app5Z9SJVYsn81W2A/tblfwFob7kxowCKER"
+        },
+        "filterByFormula": "={module_name}  = '{{ $('Get Assignment').item.json.fields['module_name (from module_id)'][0] }}'",
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        -400
+      ],
+      "id": "fa25dc6a-2d16-46e3-810f-c3c0c86137ae",
+      "name": "Get Training Module",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "fgT90T4Sh3ZIkv2X",
+          "name": "Airtable Personal Access Token account 2 - copy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b913a33c-7d08-4557-b24c-c648bbf85b26",
+              "leftValue": "={{ $('Normalize Payload').item.json.score }}",
+              "rightValue": "={{ $json.fields.passing_score }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1296,
+        -400
+      ],
+      "id": "17fc7842-2149-404c-a107-714e3c153d62",
+      "name": "Evaluate Score"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "app5Z9SJVYsn81W2A",
+          "mode": "list",
+          "cachedResultName": "final-proyek-nfa",
+          "cachedResultUrl": "https://airtable.com/app5Z9SJVYsn81W2A"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl2Tx0mu6PwtfBnr",
+          "mode": "list",
+          "cachedResultName": "training_assignments",
+          "cachedResultUrl": "https://airtable.com/app5Z9SJVYsn81W2A/tbl2Tx0mu6PwtfBnr"
+        },
+        "filterByFormula": "={assignment_id} = '{{ $json.assignment_id }}'",
+        "returnAll": false,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        -384
+      ],
+      "id": "624310a1-9a93-4f09-911f-e9995fd4dd67",
+      "name": "Get Assignment",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "fgT90T4Sh3ZIkv2X",
+          "name": "Airtable Personal Access Token account 2 - copy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "app5Z9SJVYsn81W2A",
+          "mode": "list",
+          "cachedResultName": "final-proyek-nfa",
+          "cachedResultUrl": "https://airtable.com/app5Z9SJVYsn81W2A"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl2Tx0mu6PwtfBnr",
+          "mode": "list",
+          "cachedResultName": "training_assignments",
+          "cachedResultUrl": "https://airtable.com/app5Z9SJVYsn81W2A/tbl2Tx0mu6PwtfBnr"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "assignment_id": "={{ $('Normalize Payload').item.json.assignment_id }}",
+            "completion_date": "={{ $('Normalize Payload').item.json.submitted_at }}",
+            "status": "Completed",
+            "score": "={{ $('Normalize Payload').item.json.score }}",
+            "certificate": "={{ [{ \"url\": $json.pdf_url }] }}"
+          },
+          "matchingColumns": [
+            "assignment_id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "assignment_id",
+              "displayName": "assignment_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "auto_number",
+              "displayName": "auto_number",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "﻿employee_id (from employee_id)",
+              "displayName": "﻿employee_id (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "full_name (from employee_id)",
+              "displayName": "full_name (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "email (from employee_id)",
+              "displayName": "email (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "module_id",
+              "displayName": "module_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "quiz_link (from module_id)",
+              "displayName": "quiz_link (from module_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "module_name (from module_id)",
+              "displayName": "module_name (from module_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "assigned_date",
+              "displayName": "assigned_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "due_date",
+              "displayName": "due_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "completion_date",
+              "displayName": "completion_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Completed",
+                  "value": "Completed"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                },
+                {
+                  "name": "In Progress",
+                  "value": "In Progress"
+                },
+                {
+                  "name": "Assigned",
+                  "value": "Assigned"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "reminder_count",
+              "displayName": "reminder_count",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "last_reminder_sent",
+              "displayName": "last_reminder_sent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "expiry_date",
+              "displayName": "expiry_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "quiz_sent",
+              "displayName": "quiz_sent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "quiz_sent_date",
+              "displayName": "quiz_sent_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "certificate",
+              "displayName": "certificate",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1744,
+        -512
+      ],
+      "id": "d35468b2-a6ea-4187-9dbc-239ad73c3466",
+      "name": "Update Assignment",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "fgT90T4Sh3ZIkv2X",
+          "name": "Airtable Personal Access Token account 2 - copy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Get Employee').item.json.fields.email }}",
+        "subject": "[Notification] Your Certification Exam Results",
+        "message": "=<!DOCTYPE html>\n<html lang=\"id\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Training Completion &amp; Certification Notice</title>\n</head>\n<body style=\"margin: 0; padding: 0; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;\">\n\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color: #f8fafc; padding: 40px 16px;\">\n    <tr>\n      <td align=\"center\">\n        \n        <!-- Main Container -->\n        <table width=\"100%\" maxWidth=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;\">\n          \n          <!-- Header/Branding -->\n          <tr>\n            <td style=\"padding: 40px 40px 24px 40px;\">\n              <div style=\"font-size: 12px; font-weight: 600; color: #15803d; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;\">Human Resources &amp; Development</div>\n              <h1 style=\"margin: 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;\">Training Certification Completion</h1>\n            </td>\n          </tr>\n\n          <!-- Content Body -->\n          <tr>\n            <td style=\"padding: 0 40px 32px 40px; font-size: 15px; line-height: 1.6; color: #334155;\">\n              <p style=\"margin: 0 0 20px 0;\">Halo <strong>{{ $('Get Employee').item.json.fields.full_name }}</strong>,</p>\n              <p style=\"margin: 0 0 32px 0;\">Selamat, Anda dinyatakan berhasil menyelesaikan ujian evaluasi sertifikasi dengan hasil yang memenuhi standar kualifikasi perusahaan. Berikut adalah ringkasan dokumentasi hasil ujian Anda:</p>\n\n              <!-- Score Card Table -->\n              <div style=\"margin-bottom: 32px;\">\n                <div style=\"font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;\">Detail Hasil Evaluasi</div>\n                <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-top: 1px solid #edf2f7; border-bottom: 1px solid #edf2f7; padding: 12px 0;\">\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; width: 35%; font-size: 14px; color: #64748b;\">Nama</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; font-weight: 600; color: #0f172a;\">{{ $('Get Employee').item.json.fields.full_name }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #64748b;\">Assignment ID</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #334155; font-family: monospace;\">{{ $('Get Assignment').item.json.fields.assignment_id }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #64748b;\">Skor Evaluasi</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 16px; font-weight: 700; color: #15803d;\">{{ $('Normalize Payload').item.json.score }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #64748b;\">Tanggal Kelulusan</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #334155;\">{{ $('Normalize Payload').item.json.submitted_at_display }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #64748b;\">Status</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 12px; font-weight: 700; color: #15803d; letter-spacing: 0.05em;\">LULUS</td>\n                  </tr>\n                </table>\n              </div>\n\n              <!-- Certificate Download Information -->\n              <div style=\"background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin-bottom: 32px;\">\n                <h2 style=\"margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em;\">Dokumen Sertifikat</h2>\n                <p style=\"margin: 0 0 12px 0; font-size: 14px; color: #334155;\">Sertifikat kompetensi resmi Anda telah diterbitkan oleh sistem dan terlampir pada email ini sebagai dokumen sah bukti penyelesaian pelatihan.</p>\n                <p style=\"margin: 0; font-size: 14px;\">\n                  <a href=\"{{ $json.fields.certificate[0].url }}\" style=\"color: #15803d; font-weight: 600; text-decoration: underline;\">Unduh Salinan Sertifikat Digital</a>\n                </p>\n              </div>\n\n              <!-- Closing Paragraph -->\n              <p style=\"margin: 0 0 24px 0; font-size: 15px; color: #334155;\">\n                Apresiasi tinggi atas dedikasi dan komitmen belajar yang telah Anda tunjukkan selama program berlangsung. Terus pertahankan standar kinerja profesional ini untuk pengembangan karier Anda ke depan.\n              </p>\n              \n              <p style=\"margin: 0; font-size: 14px; color: #334155;\">\n                Salam hangat,<br>\n                <strong>Tim Human Resources</strong>\n              </p>\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;\">\n              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"font-size: 12px; color: #94a3b8; line-height: 1.5;\">\n                <tr>\n                  <td>\n                    Email ini dikirimkan secara otomatis oleh NFA Training &amp; Certification Platform.<br>\n                    Dokumen konfirmasi resmi korporat — mohon tidak membalas pesan ini secara langsung.\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n        </table>\n        \n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>",
+        "options": {
+          "appendAttribution": false,
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2128,
+        -512
+      ],
+      "id": "7a104eb7-7933-4e25-b81a-55e430bc5db0",
+      "name": "Send Success Email",
+      "webhookId": "e644245a-f21f-4d6d-a711-f9ea5ed7e02d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yW1I0RUJjy0spB9C",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "app5Z9SJVYsn81W2A",
+          "mode": "list",
+          "cachedResultName": "final-proyek-nfa",
+          "cachedResultUrl": "https://airtable.com/app5Z9SJVYsn81W2A"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl2Tx0mu6PwtfBnr",
+          "mode": "list",
+          "cachedResultName": "training_assignments",
+          "cachedResultUrl": "https://airtable.com/app5Z9SJVYsn81W2A/tbl2Tx0mu6PwtfBnr"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "score": "={{ $('Normalize Payload').item.json.score }}",
+            "completion_date": "={{ $('Normalize Payload').item.json.submitted_at }}",
+            "status": "Failed",
+            "assignment_id": "={{ $('Normalize Payload').item.json.assignment_id }}"
+          },
+          "matchingColumns": [
+            "assignment_id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "assignment_id",
+              "displayName": "assignment_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "auto_number",
+              "displayName": "auto_number",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "﻿employee_id (from employee_id)",
+              "displayName": "﻿employee_id (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "full_name (from employee_id)",
+              "displayName": "full_name (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "email (from employee_id)",
+              "displayName": "email (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "module_id",
+              "displayName": "module_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "quiz_link (from module_id)",
+              "displayName": "quiz_link (from module_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "module_name (from module_id)",
+              "displayName": "module_name (from module_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "assigned_date",
+              "displayName": "assigned_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "due_date",
+              "displayName": "due_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "completion_date",
+              "displayName": "completion_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Completed",
+                  "value": "Completed"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                },
+                {
+                  "name": "In Progress",
+                  "value": "In Progress"
+                },
+                {
+                  "name": "Assigned",
+                  "value": "Assigned"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "reminder_count",
+              "displayName": "reminder_count",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "last_reminder_sent",
+              "displayName": "last_reminder_sent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "expiry_date",
+              "displayName": "expiry_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "quiz_sent",
+              "displayName": "quiz_sent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "quiz_sent_date",
+              "displayName": "quiz_sent_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "certificate",
+              "displayName": "certificate",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1552,
+        -336
+      ],
+      "id": "95bde79c-225e-4579-97b3-5fd004d89aca",
+      "name": "Update Fail Assignment",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "fgT90T4Sh3ZIkv2X",
+          "name": "Airtable Personal Access Token account 2 - copy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Get Employee').item.json.fields.email }}",
+        "subject": "[Notification] Your Certification Exam Results",
+        "message": "=<!DOCTYPE html>\n<html lang=\"id\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Training Evaluation Result</title>\n</head>\n<body style=\"margin: 0; padding: 0; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;\">\n\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color: #f8fafc; padding: 40px 16px;\">\n    <tr>\n      <td align=\"center\">\n        \n        <!-- Main Container -->\n        <table width=\"100%\" maxWidth=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;\">\n          \n          <!-- Header/Branding -->\n          <tr>\n            <td style=\"padding: 40px 40px 24px 40px;\">\n              <div style=\"font-size: 12px; font-weight: 600; color: #b45309; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;\">Human Resources &amp; Development</div>\n              <h1 style=\"margin: 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;\">Training Certification Result</h1>\n            </td>\n          </tr>\n\n          <!-- Content Body -->\n          <tr>\n            <td style=\"padding: 0 40px 32px 40px; font-size: 15px; line-height: 1.6; color: #334155;\">\n              <p style=\"margin: 0 0 20px 0;\">Halo <strong>{{ $('Get Employee').item.json.fields.full_name }}</strong>,</p>\n              <p style=\"margin: 0 0 32px 0;\">Terima kasih telah menyelesaikan ujian evaluasi sertifikasi untuk program pelatihan Anda. Berdasarkan penilaian sistem, hasil ujian Anda saat ini belum memenuhi ambang batas nilai kelulusan minimum yang ditetapkan perusahaan.</p>\n\n              <!-- Score Card Table -->\n              <div style=\"margin-bottom: 32px;\">\n                <div style=\"font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;\">Detail Hasil Evaluasi</div>\n                <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-top: 1px solid #edf2f7; border-bottom: 1px solid #edf2f7; padding: 12px 0;\">\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; width: 35%; font-size: 14px; color: #64748b;\">Nama</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; font-weight: 600; color: #0f172a;\">{{ $('Get Employee').item.json.fields.full_name }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #64748b;\">Assignment ID</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #334155; font-family: monospace;\">{{ $('Get Assignment').item.json.fields.assignment_id }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #64748b;\">Skor Evaluasi</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 16px; font-weight: 700; color: #b45309;\">{{ $('Normalize Payload').item.json.score }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #64748b;\">Tanggal Evaluasi</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #334155;\">{{ $('Normalize Payload').item.json.submitted_at_display }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #64748b;\">Status</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 12px; font-weight: 700; color: #b45309; letter-spacing: 0.05em;\">BELUM LULUS</td>\n                  </tr>\n                </table>\n              </div>\n\n              <!-- Next Steps / Remedial Information -->\n              <div style=\"background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin-bottom: 32px;\">\n                <h2 style=\"margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em;\">Langkah Tindak Lanjut</h2>\n                <p style=\"margin: 0 0 12px 0; font-size: 14px; color: #334155;\">Anda diberikan kesempatan untuk meninjau kembali modul materi pembelajaran yang telah disediakan sebelumnya guna mempersiapkan sesi evaluasi ulang (remedial).</p>\n                <p style=\"margin: 0; font-size: 14px;\">\n                  <a href=\"{{ $('Get Training Module').item.json.fields.material_link }}\" style=\"color: #0f172a; font-weight: 600; text-decoration: underline;\">Buka Kembali Materi Pelatihan</a>\n                </p>\n              </div>\n\n              <!-- Closing Paragraph -->\n              <p style=\"margin: 0 0 24px 0; font-size: 15px; color: #334155;\">\n                Jangan berkecil hati, jadikan hasil ini sebagai tolok ukur untuk memahami bagian materi yang memerlukan pendalaman lebih lanjut. Jadwal pengerjaan evaluasi ulang akan diinformasikan oleh sistem atau tim HR dalam waktu dekat.\n              </p>\n              \n              <p style=\"margin: 0; font-size: 14px; color: #334155;\">\n                Salam hangat,<br>\n                <strong>Tim Human Resources</strong>\n              </p>\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;\">\n              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"font-size: 12px; color: #94a3b8; line-height: 1.5;\">\n                <tr>\n                  <td>\n                    Email ini dikirimkan secara otomatis oleh NFA Training &amp; Certification Platform.<br>\n                    Dokumen konfirmasi resmi korporat — mohon tidak membalas pesan ini secara langsung.\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n        </table>\n        \n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1744,
+        -336
+      ],
+      "id": "8ea6a7aa-3667-4241-81de-8640d90ee539",
+      "name": "Send Fail Email",
+      "webhookId": "f1a0f7cc-da85-4597-9b1c-52c890f2d2be",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yW1I0RUJjy0spB9C",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Flow 3 — Quiz Submission & Certificated Released",
+        "height": 80,
+        "width": 592,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        144,
+        -528
+      ],
+      "typeVersion": 1,
+      "id": "980aac11-5b07-494f-98bf-9aa2fb0ffb8c",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "html_content": "=<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n  @page {\n    size: A4 landscape;\n    margin: 0;\n  }\n\n  * { margin: 0; padding: 0; box-sizing: border-box; }\n  body {\n    width: 1122px;\n    height: 794px;\n    font-family: 'Segoe UI', Arial, sans-serif;\n    background: #f0f4ff;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    overflow: hidden;\n  }\n  .cert-wrap {\n    width: 1082px;\n    height: 754px;\n    position: relative;\n    background: #ffffff;\n    border: 3px solid #1a3a6b;\n    overflow: hidden;\n  }\n\n  /* Dekorasi sudut biru kiri bawah */\n  .deco-bl {\n    position: absolute;\n    bottom: 0; left: 0;\n    width: 220px; height: 300px;\n    overflow: hidden;\n    z-index: 0;\n  }\n  .deco-bl::before {\n    content: '';\n    position: absolute;\n    bottom: -40px; left: -60px;\n    width: 300px; height: 300px;\n    background: #1565c0;\n    transform: rotate(-30deg);\n    transform-origin: bottom left;\n  }\n  .deco-bl::after {\n    content: '';\n    position: absolute;\n    bottom: 30px; left: -20px;\n    width: 200px; height: 200px;\n    background: #42a5f5;\n    transform: rotate(-20deg);\n    transform-origin: bottom left;\n    opacity: 0.7;\n  }\n  .deco-bl-light {\n    position: absolute;\n    bottom: 80px; left: 10px;\n    width: 120px; height: 160px;\n    background: #90caf9;\n    transform: rotate(-25deg);\n    transform-origin: bottom left;\n    opacity: 0.5;\n    z-index: 0;\n  }\n\n  /* Dekorasi sudut kanan atas */\n  .deco-tr {\n    position: absolute;\n    top: 0; right: 0;\n    width: 220px; height: 300px;\n    overflow: hidden;\n    z-index: 0;\n  }\n  .deco-tr::before {\n    content: '';\n    position: absolute;\n    top: -40px; right: -60px;\n    width: 300px; height: 300px;\n    background: #1565c0;\n    transform: rotate(-30deg);\n    transform-origin: top right;\n  }\n  .deco-tr::after {\n    content: '';\n    position: absolute;\n    top: 30px; right: -20px;\n    width: 200px; height: 200px;\n    background: #42a5f5;\n    transform: rotate(-20deg);\n    transform-origin: top right;\n    opacity: 0.7;\n  }\n  .deco-tr-light {\n    position: absolute;\n    top: 80px; right: 10px;\n    width: 120px; height: 160px;\n    background: #90caf9;\n    transform: rotate(-25deg);\n    transform-origin: top right;\n    opacity: 0.5;\n    z-index: 0;\n  }\n\n  /* Border dalam */\n  .inner-border {\n    position: absolute;\n    top: 16px; left: 16px;\n    right: 16px; bottom: 16px;\n    border: 1.5px solid #1a3a6b;\n    z-index: 1;\n    pointer-events: none;\n  }\n\n  /* Konten utama */\n  .content {\n    position: relative;\n    z-index: 2;\n    height: 100%;\n    display: flex;\n    flex-direction: column;\n    align-items: center;\n    justify-content: center;\n    padding: 40px 120px;\n    text-align: center;\n  }\n\n  .title {\n    font-size: 56px;\n    font-weight: 900;\n    color: #1a3a6b;\n    letter-spacing: 8px;\n    text-transform: uppercase;\n    margin-bottom: 4px;\n  }\n  .subtitle {\n    font-size: 20px;\n    font-weight: 600;\n    color: #1a3a6b;\n    letter-spacing: 6px;\n    text-transform: uppercase;\n    margin-bottom: 20px;\n  }\n  .given-to {\n    font-size: 15px;\n    color: #444;\n    margin-bottom: 18px;\n    font-style: italic;\n  }\n  .name-line {\n    width: 420px;\n    border-bottom: 2px solid #1a3a6b;\n    margin: 0 auto 6px;\n  }\n  .recipient-name {\n    font-size: 32px;\n    font-weight: 700;\n    color: #1a3a6b;\n    margin-bottom: 6px;\n  }\n  .role-label {\n    font-size: 14px;\n    color: #555;\n    margin-bottom: 4px;\n  }\n  .role-value {\n    font-size: 24px;\n    font-weight: 800;\n    font-style: italic;\n    color: #1a3a6b;\n    letter-spacing: 2px;\n    margin-bottom: 20px;\n  }\n  .desc {\n    font-size: 13px;\n    color: #444;\n    line-height: 1.7;\n    max-width: 560px;\n    margin-bottom: 32px;\n  }\n\n  /* Bagian tanda tangan */\n  .signatures {\n    display: flex;\n    align-items: center;\n    justify-content: space-between;\n    width: 100%;\n    padding: 0 20px;\n  }\n  .sig-block {\n    text-align: center;\n    width: 200px;\n  }\n  .sig-line {\n    border-top: 2px solid #1a3a6b;\n    margin-bottom: 6px;\n  }\n  .sig-name {\n    font-size: 13px;\n    font-weight: 700;\n    color: #1a3a6b;\n    letter-spacing: 1px;\n  }\n  .sig-title {\n    font-size: 11px;\n    color: #777;\n  }\n\n  /* Laurel icon tengah */\n  .laurel {\n    font-size: 48px;\n    color: #c8922a;\n  }\n\n  /* Info skor & tanggal */\n  .meta {\n    font-size: 12px;\n    color: #888;\n    margin-top: 8px;\n  }\n</style>\n</head>\n<body>\n<div class=\"cert-wrap\">\n\n  <!-- Decorations -->\n  <div class=\"deco-bl\"></div>\n  <div class=\"deco-bl-light\"></div>\n  <div class=\"deco-tr\"></div>\n  <div class=\"deco-tr-light\"></div>\n  <div class=\"inner-border\"></div>\n\n  <!-- Content -->\n  <div class=\"content\">\n    <div class=\"title\">Certificate</div>\n    <div class=\"subtitle\">Of Achievement</div>\n    <div class=\"given-to\">Proudly presented to:</div>\n\n    <div class=\"name-line\"></div>\n    <div class=\"recipient-name\">{{ $('Get Employee').item.json.fields.full_name }}</div>\n\n    <div class=\"role-label\">As:</div>\n    <div class=\"role-value\">{{ $('Get Employee').item.json.fields['role_name (from role_id)'][0] }}</div>\n\n    <div class=\"desc\">\n      In recognition of dedication and hard work, has successfully completed the\n      Fullstack Developer Bootcamp with a <strong>Satisfactory</strong> grade,\n      based on the final examination score of <strong>{{ $('Normalize Payload').item.json.score }}</strong>.\n    </div>\n\n    <div class=\"signatures\">\n      <div class=\"sig-block\"></div>\n\n      <div class=\"laurel\">🏅</div>\n\n      <div class=\"sig-block\"></div>\n    </div>\n\n    <div class=\"meta\">\n      Assignment ID: {{ $('Normalize Payload').item.json.assignment_id }} &nbsp;|&nbsp;\n      Date: {{ $('Normalize Payload').item.json.submitted_at_display }}\n    </div>\n  </div>\n\n</div>\n</body>\n</html>",
+        "output_filename": "={{ $('Get Employee').item.json.fields.full_name }} - {{ $('Get Training Module').item.json.fields.module_name }} Certificated ",
+        "dynamic_params": {
+          "params": [
+            {
+              "key": "paperFormat",
+              "value": "a4"
+            },
+            {
+              "key": "paperOrientation",
+              "value": "landscape"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-htmlcsstopdf.htmlcsstopdf",
+      "typeVersion": 1,
+      "position": [
+        1552,
+        -512
+      ],
+      "id": "5101e72a-2494-429d-8eee-5e773c83758a",
+      "name": "Convert HTML to PDF",
+      "credentials": {
+        "htmlcsstopdfApi": {
+          "id": "aRJrFFJBbPPfUX61",
+          "name": "HTML to PDF account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.fields.certificate[0].url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1936,
+        -512
+      ],
+      "id": "77c8a895-38fc-4531-b5ed-a70cb0b817aa",
+      "name": "Download Certificated"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Tally Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Payload": {
+      "main": [
+        [
+          {
+            "node": "Get Assignment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Assignment": {
+      "main": [
+        [
+          {
+            "node": "Get Employee",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Employee": {
+      "main": [
+        [
+          {
+            "node": "Get Training Module",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Training Module": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Score": {
+      "main": [
+        [
+          {
+            "node": "Convert HTML to PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Fail Assignment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Assignment": {
+      "main": [
+        [
+          {
+            "node": "Validate Assignment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Assignment": {
+      "main": [
+        [
+          {
+            "node": "Download Certificated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Fail Assignment": {
+      "main": [
+        [
+          {
+            "node": "Send Fail Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert HTML to PDF": {
+      "main": [
+        [
+          {
+            "node": "Update Assignment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Certificated": {
+      "main": [
+        [
+          {
+            "node": "Send Success Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "697972ad-5ffb-4a65-9cbc-185d8d61225c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "df546d4de5157fa1c7b69582cb72f6572011a520a5fa57642bdc2e7ce1f74a37"
+  },
+  "nodeGroups": [],
+  "id": "OsDSHXWB7II12DEu",
+  "tags": [
+    {
+      "updatedAt": "2026-06-01T10:54:08.345Z",
+      "createdAt": "2026-06-01T10:53:44.118Z",
+      "id": "fH0zJts3HnXNV9yb",
+      "name": "Final Proyek NFA AI"
+    }
+  ]
+}
