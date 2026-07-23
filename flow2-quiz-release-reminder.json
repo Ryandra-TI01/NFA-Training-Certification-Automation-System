@@ -1,0 +1,1429 @@
+{
+  "name": "Flow 2 — Quiz Release + Reminder",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        -208
+      ],
+      "id": "35a6b43b-a29f-4c7d-8089-f448668bb1ee",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================\n// NODE 3 — QUIZ RELEASE + REMINDER + ESCALATION\n// Sesuai spec: 3-stage reminder dengan state machine\n// ============================================\n\nconst assignments = $input.all();\nconst now = new Date();\n\nconst quizToSend     = [];\nconst reminderToSend = [];\nconst toEscalate     = [];\n\nfor (const item of assignments) {\n  const f = item.json.fields;\n\n  const assignedDate = new Date(f.assigned_date);\n  const dueDate      = new Date(f.due_date);\n  const quizSentDate = f.quiz_sent_date ? new Date(f.quiz_sent_date) : null;\n\n  const ageInDays        = diffDays(now, assignedDate);\n  const daysSinceQuiz    = quizSentDate ? diffDays(now, quizSentDate) : null;\n  const daysUntilDue     = diffDays(dueDate, now); // positif = belum due\n  const isOverdue        = now > dueDate;\n  const reminderCount    = f.reminder_count || 0;\n\n  // --------------------------\n  // QUIZ RELEASE\n  // status=Assigned, quiz_sent=false, umur >= 7 hari\n  // --------------------------\n  if (\n    f.status === 'Assigned' &&\n    !f.quiz_sent &&\n    ageInDays >= 7\n  ) {\n    quizToSend.push(buildItem('send_quiz', item, f, { dueDate }));\n    continue;\n  }\n\n  // --------------------------\n  // ESCALATION (cek sebelum reminder — prioritas tertinggi)\n  // status=In Progress, due_date sudah lewat\n  // --------------------------\n  if (\n    f.status === 'In Progress' &&\n    isOverdue\n  ) {\n    toEscalate.push(buildItem('escalate', item, f, {\n      dueDate,\n      days_overdue: Math.floor(diffDays(now, dueDate))\n    }));\n    continue;\n  }\n\n  // --------------------------\n  // REMINDER 1\n  // reminder_count=0, today >= quiz_sent_date + 3\n  // --------------------------\n  if (\n    f.status === 'In Progress' &&\n    f.quiz_sent === true &&\n    reminderCount === 0 &&\n    daysSinceQuiz !== null &&\n    daysSinceQuiz >= 3\n  ) {\n    reminderToSend.push(buildItem('reminder_1', item, f, {\n      dueDate,\n      reminder_number: 1,\n      next_reminder_count: 1,\n      message_context: `Quiz belum dikerjakan. Anda masih punya waktu hingga ${formatDateWIB(dueDate)}.`\n    }));\n    continue;\n  }\n\n  // --------------------------\n  // REMINDER 2\n  // reminder_count=1, today >= quiz_sent_date + 5\n  // --------------------------\n  if (\n    f.status === 'In Progress' &&\n    reminderCount === 1 &&\n    daysSinceQuiz !== null &&\n    daysSinceQuiz >= 5\n  ) {\n    reminderToSend.push(buildItem('reminder_2', item, f, {\n      dueDate,\n      reminder_number: 2,\n      next_reminder_count: 2,\n      message_context: `Ini pengingat kedua. Deadline semakin dekat.`\n    }));\n    continue;\n  }\n\n  // --------------------------\n  // REMINDER 3\n  // reminder_count=2, today >= due_date - 1 hari\n  // --------------------------\n  if (\n    f.status === 'In Progress' &&\n    reminderCount === 2 &&\n    daysUntilDue <= 1 &&\n    !isOverdue\n  ) {\n    reminderToSend.push(buildItem('reminder_3', item, f, {\n      dueDate,\n      reminder_number: 3,\n      next_reminder_count: 3,\n      message_context: `⚠️ Deadline besok! Ini pengingat terakhir sebelum eskalasi ke HR.`\n    }));\n    continue;\n  }\n\n}\n\nreturn [...quizToSend, ...reminderToSend, ...toEscalate];\n\n\n// ============================================\n// HELPERS\n// ============================================\n\nfunction diffDays(laterDate, earlierDate) {\n  return (laterDate - earlierDate) / (1000 * 60 * 60 * 24);\n}\n\nfunction formatDateWIB(date) {\n  const wib = new Date(date.getTime() + (7 * 60 * 60 * 1000));\n  const days   = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];\n  const months = ['Januari','Februari','Maret','April','Mei','Juni',\n                  'Juli','Agustus','September','Oktober','November','Desember'];\n  return `${days[wib.getUTCDay()]}, ${wib.getUTCDate()} ${months[wib.getUTCMonth()]} ${wib.getUTCFullYear()}`;\n}\n\nfunction buildItem(action, item, f, extras = {}) {\n  return {\n    json: {\n      action,\n      record_id:      item.json.id,\n      assignment_id:  f.assignment_id,\n      employee_name:  f['full_name (from employee_id)']?.[0],\n      employee_email: f['email (from employee_id)']?.[0]?.trim(),\n      module_name:    f['module_name (from module_id)']?.[0],\n      module_quiz_url: f['quiz_link (from module_id)']?.[0],\n      reminder_count: f.reminder_count || 0,\n      due_date_display: extras.dueDate ? formatDateWIB(extras.dueDate) : null,\n      ...extras\n    }\n  };\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -208
+      ],
+      "id": "c6d7ee39-150a-4890-b070-a1c56343bcd2",
+      "name": "Quiz Release Logic",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "send_quiz",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "498103d8-bb16-4caf-a3a5-668e67152ca0"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "send_quiz"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "26b9a1d7-1d01-4c48-ade8-2d7fc17fe5f8",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "reminder_1",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reminder_1"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "8c79676a-acdc-4c95-ad04-2d05a5e30ce1",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "reminder_2",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reminder_2"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "baa6fdef-ab31-451f-a04b-2022265c7981",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "reminder_3",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reminder_3"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "5a849baf-c6e1-4d42-8b0e-5a10996047a1",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "escalate",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "escalate"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        -384
+      ],
+      "id": "c2725306-bd8c-4a62-85ef-3a6a468948f3",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "sendTo": "ryan23013ti@student.nurulfikri.ac.id",
+        "subject": "=[ESKALASI] {{ $json.employee_name }} belum menyelesaikan quiz - {{ $json.module_name }}",
+        "message": "=<!DOCTYPE html>\n<html lang=\"id\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Training Assignment Escalation</title>\n</head>\n<body style=\"margin: 0; padding: 0; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;\">\n\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color: #f8fafc; padding: 40px 16px;\">\n    <tr>\n      <td align=\"center\">\n        \n        <!-- Main Container -->\n        <table width=\"100%\" maxWidth=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;\">\n          \n          <!-- Header/Branding -->\n          <tr>\n            <td style=\"padding: 40px 40px 24px 40px;\">\n              <div style=\"font-size: 12px; font-weight: 600; color: #941c1c; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;\">System Escalation Notice</div>\n              <h1 style=\"margin: 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;\">Overdue Training Evaluation</h1>\n            </td>\n          </tr>\n\n          <!-- Content Body -->\n          <tr>\n            <td style=\"padding: 0 40px 32px 40px; font-size: 15px; line-height: 1.6; color: #334155;\">\n              <p style=\"margin: 0 0 20px 0;\">Halo Tim HR,</p>\n              <p style=\"margin: 0 0 32px 0;\">Sistem mendeteksi adanya keterlambatan pengisian evaluasi wajib. Karyawan di bawah ini tercatat belum menyelesaikan quiz hingga melewati batas waktu yang ditentukan, meskipun telah menerima 3 kali pengingat otomatis.</p>\n\n              <!-- Detail Karyawan Table -->\n              <div style=\"margin-bottom: 32px;\">\n                <div style=\"font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;\">Detail Karyawan</div>\n                <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-top: 1px solid #edf2f7; border-bottom: 1px solid #edf2f7; padding: 12px 0;\">\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; width: 35%; font-size: 14px; color: #64748b;\">Nama</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; font-weight: 600; color: #0f172a;\">{{ $json.employee_name }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #64748b;\">Email</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #334155;\">{{ $json.employee_email }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #64748b;\">Modul Training</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #334155;\">{{ $json.module_name }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #64748b;\">Assignment ID</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #334155; font-family: monospace;\">{{ $json.assignment_id }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #64748b;\">Batas Waktu (Due Date)</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #334155;\">{{ $json.due_date_display }}</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; color: #64748b;\">Durasi Keterlambatan</td>\n                    <td style=\"padding: 6px 0; vertical-align: top; font-size: 14px; font-weight: 600; color: #941c1c;\">{{ $json.days_overdue }} hari</td>\n                  </tr>\n                </table>\n              </div>\n\n              <!-- Recommended Actions Section -->\n              <div style=\"background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin-bottom: 32px;\">\n                <h2 style=\"margin: 0 0 12px 0; font-size: 13px; font-weight: 600; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em;\">Rekomendasi Tindak Lanjut</h2>\n                <ul style=\"margin: 0; padding-left: 20px; color: #334155; font-size: 14px;\">\n                  <li style=\"margin-bottom: 6px;\">Melakukan konfirmasi langsung kepada karyawan yang bersangkutan terkait kendala pengerjaan.</li>\n                  <li style=\"margin-bottom: 6px;\">Evaluasi urgensi kebutuhan perpanjangan batas waktu pengerjaan (extension).</li>\n                  <li style=\"margin-bottom: 0;\">Mencatat status dan dokumentasi hasil tindak lanjut pada basis data operasional.</li>\n                </ul>\n              </div>\n\n              <p style=\"margin: 0; font-size: 13px; color: #64748b;\">\n                Catatan Sistem: Status penugasan (*assignment status*) untuk ID ini telah diubah menjadi <strong>Failed</strong> secara otomatis. Jika tim HR memutuskan untuk memberikan perpanjangan waktu, pembaruan status dapat disesuaikan kembali melalui Airtable.\n              </p>\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;\">\n              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"font-size: 12px; color: #94a3b8; line-height: 1.5;\">\n                <tr>\n                  <td>\n                    Email ini dikirimkan secara otomatis oleh HR Automation System · Training &amp; Certification Platform.<br>\n                    Laporan eskalasi internal — mohon untuk tidak membalas pesan ini secara langsung.\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n        </table>\n        \n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1408,
+        -128
+      ],
+      "id": "e88e8830-17ea-4271-befe-03fe0d7e5d30",
+      "name": "escalate email",
+      "webhookId": "bf973f48-7cfa-4bda-9f2a-f18b66036ea0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yW1I0RUJjy0spB9C",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.employee_email }}",
+        "subject": "=Quiz Training - {{ $json.module_name }}",
+        "message": "=<!DOCTYPE html>\n<html lang=\"id\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Training Evaluation Notification</title>\n</head>\n<body style=\"margin: 0; padding: 0; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;\">\n\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color: #f8fafc; padding: 40px 16px;\">\n    <tr>\n      <td align=\"center\">\n        \n        <!-- Main Container -->\n        <table width=\"100%\" maxWidth=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;\">\n          \n          <!-- Header/Branding -->\n          <tr>\n            <td style=\"padding: 40px 40px 24px 40px;\">\n              <div style=\"font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;\">Human Resources &amp; Development</div>\n              <h1 style=\"margin: 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;\">Training Evaluation Notice</h1>\n            </td>\n          </tr>\n\n          <!-- Content Body -->\n          <tr>\n            <td style=\"padding: 0 40px 32px 40px; font-size: 15px; line-height: 1.6; color: #334155;\">\n              <p style=\"margin: 0 0 20px 0;\">Halo <strong>{{ $json.employee_name }}</strong>,</p>\n              <p style=\"margin: 0 0 32px 0;\">Masa pembelajaran mandiri untuk modul pelatihan Anda telah selesai. Tahap selanjutnya adalah menyelesaikan evaluasi/quiz resmi untuk mengukur pemahaman materi.</p>\n\n              <!-- Metadata Grid -->\n              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-bottom: 32px; border-top: 1px solid #edf2f7; border-bottom: 1px solid #edf2f7; padding: 16px 0;\">\n                <tr>\n                  <td style=\"padding: 8px 0; vertical-align: top; width: 30%;\">\n                    <span style=\"font-size: 13px; color: #64748b; font-weight: 500;\">Nama Modul</span>\n                  </td>\n                  <td style=\"padding: 8px 0; vertical-align: top; font-weight: 600; color: #0f172a;\">\n                    {{ $json.module_name }}\n                  </td>\n                </tr>\n                <tr>\n                  <td style=\"padding: 8px 0; vertical-align: top;\">\n                    <span style=\"font-size: 13px; color: #64748b; font-weight: 500;\">Assignment ID</span>\n                  </td>\n                  <td style=\"padding: 8px 0; vertical-align: top; color: #334155;\">\n                    {{ $json.assignment_id }}\n                  </td>\n                </tr>\n                <tr>\n                  <td style=\"padding: 8px 0; vertical-align: top;\">\n                    <span style=\"font-size: 13px; color: #64748b; font-weight: 500;\">Batas Waktu</span>\n                  </td>\n                  <td style=\"padding: 8px 0; vertical-align: top; font-weight: 600; color: #941c1c;\">\n                    {{ $json.due_date_display }}\n                  </td>\n                </tr>\n              </table>\n\n              <!-- Instructions Section -->\n              <div style=\"background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin-bottom: 32px;\">\n                <h2 style=\"margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em;\">Prosedur Pengerjaan</h2>\n                <ul style=\"margin: 0; padding-left: 20px; color: #334155; font-size: 14px;\">\n                  <li style=\"margin-bottom: 6px;\">Evaluasi hanya dapat diakses dan dikerjakan <strong>satu kali</strong>.</li>\n                  <li style=\"margin-bottom: 6px;\">Pastikan koneksi internet Anda stabil sebelum menekan tombol mulai.</li>\n                  <li style=\"margin-bottom: 6px;\">Harap jawab seluruh pertanyaan yang tersedia hingga selesai.</li>\n                  <li style=\"margin-bottom: 0;\">Hasil penilaian akan langsung diproses oleh sistem setelah Anda melakukan submit.</li>\n                </ul>\n              </div>\n\n              <!-- Button CTA -->\n              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-bottom: 24px;\">\n                <tr>\n                  <td align=\"left\">\n                    <a href=\"{{ $json.module_quiz_url }}?assignment_id={{ $json.assignment_id }}&employee_name={{ $json.employee_name }}\" style=\"background-color: #0f172a; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;\">\n                      Mulai Evaluasi Quiz\n                    </a>\n                  </td>\n                </tr>\n              </table>\n\n              <p style=\"margin: 0; font-size: 13px; color: #64748b;\">\n                Penting: Tautan di atas bersifat personal dan terikat dengan ID karyawan Anda. Mohon tidak menyebarkan atau membagikan tautan ini kepada pihak lain.\n              </p>\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;\">\n              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"font-size: 12px; color: #94a3b8; line-height: 1.5;\">\n                <tr>\n                  <td>\n                    Email ini dikirimkan secara otomatis oleh NFA Training &amp; Certification Platform.<br>\n                    Harap tidak membalas email ini secara langsung. Jika ada kendala teknis, hubungi Helpdesk IT atau Admin HR.\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n        </table>\n        \n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1408,
+        -512
+      ],
+      "id": "63b1d071-0d68-4792-a586-f3968f7020af",
+      "name": "quiz email",
+      "webhookId": "bf973f48-7cfa-4bda-9f2a-f18b66036ea0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yW1I0RUJjy0spB9C",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.employee_email }}",
+        "subject": "=[Reminder {{ $json.reminder_number }}/3] Quiz Training - {{ $json.module_name }}",
+        "message": "=<!DOCTYPE html>\n<html lang=\"id\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Training Evaluation Reminder</title>\n</head>\n<body style=\"margin: 0; padding: 0; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;\">\n\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color: #f8fafc; padding: 40px 16px;\">\n    <tr>\n      <td align=\"center\">\n        \n        <!-- Main Container -->\n        <table width=\"100%\" maxWidth=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;\">\n          \n          <!-- Header/Branding -->\n          <tr>\n            <td style=\"padding: 40px 40px 24px 40px;\">\n              <div style=\"font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;\">Human Resources &amp; Development</div>\n              <h1 style=\"margin: 0; font-size: 22px; font-weight: 700; color: {{ $json.reminder_number === 3 ? '#b91c1c' : $json.reminder_number === 2 ? '#b45309' : '#0f172a' }}; letter-spacing: -0.01em;\">\n                {{ $json.reminder_number === 3 ? 'Final Reminder: Training Evaluation' : $json.reminder_number === 2 ? 'Second Reminder: Training Evaluation' : 'First Reminder: Training Evaluation' }}\n              </h1>\n            </td>\n          </tr>\n\n          <!-- Content Body -->\n          <tr>\n            <td style=\"padding: 0 40px 32px 40px; font-size: 15px; line-height: 1.6; color: #334155;\">\n              <p style=\"margin: 0 0 20px 0;\">Halo <strong>{{ $json.employee_name }}</strong>,</p>\n              <p style=\"margin: 0 0 32px 0;\">{{ $json.message_context }}</p>\n\n              <!-- Metadata Grid -->\n              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-bottom: 32px; border-top: 1px solid #edf2f7; border-bottom: 1px solid #edf2f7; padding: 16px 0;\">\n                <tr>\n                  <td style=\"padding: 8px 0; vertical-align: top; width: 30%;\">\n                    <span style=\"font-size: 13px; color: #64748b; font-weight: 500;\">Nama Modul</span>\n                  </td>\n                  <td style=\"padding: 8px 0; vertical-align: top; font-weight: 600; color: #0f172a;\">\n                    {{ $json.module_name }}\n                  </td>\n                </tr>\n                <tr>\n                  <td style=\"padding: 8px 0; vertical-align: top;\">\n                    <span style=\"font-size: 13px; color: #64748b; font-weight: 500;\">Assignment ID</span>\n                  </td>\n                  <td style=\"padding: 8px 0; vertical-align: top; color: #334155;\">\n                    {{ $json.assignment_id }}\n                  </td>\n                </tr>\n                <tr>\n                  <td style=\"padding: 8px 0; vertical-align: top;\">\n                    <span style=\"font-size: 13px; color: #64748b; font-weight: 500;\">Batas Waktu</span>\n                  </td>\n                  <td style=\"padding: 8px 0; vertical-align: top; font-weight: 600; color: #b91c1c;\">\n                    {{ $json.due_date_display }}\n                  </td>\n                </tr>\n              </table>\n\n              <!-- Steps/Progress Indicator (Outlook-Safe) -->\n              <div style=\"margin-bottom: 32px;\">\n                <div style=\"font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;\">Tahapan Pengingat</div>\n                <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n                  <tr>\n                    <!-- Dot 1 -->\n                    <td align=\"center\" valign=\"middle\" width=\"32\" height=\"32\" style=\"background-color: {{ $json.reminder_number >= 1 ? '#0f172a' : '#e2e8f0' }}; color: {{ $json.reminder_number >= 1 ? '#ffffff' : '#94a3b8' }}; font-size: 13px; font-weight: 600; border-radius: 50%;\">1</td>\n                    <td width=\"12\"></td>\n                    <!-- Dot 2 -->\n                    <td align=\"center\" valign=\"middle\" width=\"32\" height=\"32\" style=\"background-color: {{ $json.reminder_number >= 2 ? '#b45309' : '#e2e8f0' }}; color: {{ $json.reminder_number >= 2 ? '#ffffff' : '#94a3b8' }}; font-size: 13px; font-weight: 600; border-radius: 50%;\">2</td>\n                    <td width=\"12\"></td>\n                    <!-- Dot 3 -->\n                    <td align=\"center\" valign=\"middle\" width=\"32\" height=\"32\" style=\"background-color: {{ $json.reminder_number >= 3 ? '#b91c1c' : '#e2e8f0' }}; color: {{ $json.reminder_number >= 3 ? '#ffffff' : '#94a3b8' }}; font-size: 13px; font-weight: 600; border-radius: 50%;\">3</td>\n                    <td width=\"16\"></td>\n                    <!-- Label Status -->\n                    <td valign=\"middle\" style=\"font-size: 13px; color: #64748b;\">\n                      (Pengingat ke-{{ $json.reminder_number }} dari 3)\n                    </td>\n                  </tr>\n                </table>\n              </div>\n\n              <!-- Button CTA -->\n              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-bottom: 24px;\">\n                <tr>\n                  <td align=\"left\">\n                    <a href=\"{{ $json.module_quiz_url }}?assignment_id={{ $json.assignment_id }}\" style=\"background-color: {{ $json.reminder_number === 3 ? '#b91c1c' : $json.reminder_number === 2 ? '#b45309' : '#0f172a' }}; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;\">\n                      Mulai Evaluasi Quiz\n                    </a>\n                  </td>\n                </tr>\n              </table>\n\n              <p style=\"margin: 0; font-size: 13px; color: #64748b;\">\n                Penting: Jika Anda telah menyelesaikan evaluasi ini, abaikan notifikasi otomatis ini atau hubungi administrator sistem untuk pembaruan status.\n              </p>\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;\">\n              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"font-size: 12px; color: #94a3b8; line-height: 1.5;\">\n                <tr>\n                  <td>\n                    Email ini dikirimkan secara otomatis oleh NFA Training &amp; Certification Platform.<br>\n                    Harap tidak membalas email ini secara langsung. Jika ada kendala teknis, hubungi Helpdesk IT atau Admin HR.\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n        </table>\n        \n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1408,
+        -320
+      ],
+      "id": "1a68d0a3-04ce-463d-8a1c-434598a21886",
+      "name": "reminder email",
+      "webhookId": "bf973f48-7cfa-4bda-9f2a-f18b66036ea0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yW1I0RUJjy0spB9C",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appe3F0WYpeU6YtKv",
+          "mode": "list",
+          "cachedResultName": "final-proyek-nfa",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl7SGs0G97nyL6na",
+          "mode": "list",
+          "cachedResultName": "training_assignments",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv/tbl7SGs0G97nyL6na"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Switch').item.json.record_id }}",
+            "status": "Failed"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "assignment_id",
+              "displayName": "assignment_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "full_name (from employee_id)",
+              "displayName": "full_name (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "email (from employee_id)",
+              "displayName": "email (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "employee_id (from employee_id)",
+              "displayName": "employee_id (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "module_id",
+              "displayName": "module_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "module_name (from module_id)",
+              "displayName": "module_name (from module_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "assigned_date",
+              "displayName": "assigned_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "due_date",
+              "displayName": "due_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "completion_date",
+              "displayName": "completion_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Completed",
+                  "value": "Completed"
+                },
+                {
+                  "name": "Assigned",
+                  "value": "Assigned"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                },
+                {
+                  "name": "In Progress",
+                  "value": "In Progress"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "reminder_count",
+              "displayName": "reminder_count",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "last_reminder_sent",
+              "displayName": "last_reminder_sent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "expiry_date",
+              "displayName": "expiry_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "certificate_id",
+              "displayName": "certificate_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "quiz_submissions",
+              "displayName": "quiz_submissions",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "certificates",
+              "displayName": "certificates",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "quiz_sent",
+              "displayName": "quiz_sent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "quiz_sent_date",
+              "displayName": "quiz_sent_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1632,
+        -128
+      ],
+      "id": "de9d883b-e20f-4334-8d5b-bc304d02a8c5",
+      "name": "Update status failed",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "0JVatjY9FQ5M8FJn",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appe3F0WYpeU6YtKv",
+          "mode": "list",
+          "cachedResultName": "final-proyek-nfa",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl7SGs0G97nyL6na",
+          "mode": "list",
+          "cachedResultName": "training_assignments",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv/tbl7SGs0G97nyL6na"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Switch').item.json.record_id }}",
+            "reminder_count": "={{ $json.next_reminder_count }}",
+            "last_reminder_sent": "={{ new Date().toISOString() }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "assignment_id",
+              "displayName": "assignment_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "full_name (from employee_id)",
+              "displayName": "full_name (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "email (from employee_id)",
+              "displayName": "email (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "employee_id (from employee_id)",
+              "displayName": "employee_id (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "module_id",
+              "displayName": "module_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "module_name (from module_id)",
+              "displayName": "module_name (from module_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "assigned_date",
+              "displayName": "assigned_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "due_date",
+              "displayName": "due_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "completion_date",
+              "displayName": "completion_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Completed",
+                  "value": "Completed"
+                },
+                {
+                  "name": "Assigned",
+                  "value": "Assigned"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                },
+                {
+                  "name": "In Progress",
+                  "value": "In Progress"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "reminder_count",
+              "displayName": "reminder_count",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_reminder_sent",
+              "displayName": "last_reminder_sent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expiry_date",
+              "displayName": "expiry_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "certificate_id",
+              "displayName": "certificate_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "quiz_submissions",
+              "displayName": "quiz_submissions",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "certificates",
+              "displayName": "certificates",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "quiz_sent",
+              "displayName": "quiz_sent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "quiz_sent_date",
+              "displayName": "quiz_sent_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1632,
+        -320
+      ],
+      "id": "16cbcc27-97cb-429b-ac4b-26067ce4ae80",
+      "name": "Update reminder 1/2/3",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "0JVatjY9FQ5M8FJn",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appe3F0WYpeU6YtKv",
+          "mode": "list",
+          "cachedResultName": "final-proyek-nfa",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl7SGs0G97nyL6na",
+          "mode": "list",
+          "cachedResultName": "training_assignments",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv/tbl7SGs0G97nyL6na"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "quiz_sent": true,
+            "id": "={{ $('Switch').item.json.record_id }}",
+            "status": "In Progress",
+            "quiz_sent_date": "={{ new Date().toISOString() }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "assignment_id",
+              "displayName": "assignment_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "full_name (from employee_id)",
+              "displayName": "full_name (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "email (from employee_id)",
+              "displayName": "email (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "employee_id (from employee_id)",
+              "displayName": "employee_id (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "module_id",
+              "displayName": "module_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "module_name (from module_id)",
+              "displayName": "module_name (from module_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "assigned_date",
+              "displayName": "assigned_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "due_date",
+              "displayName": "due_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "completion_date",
+              "displayName": "completion_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Completed",
+                  "value": "Completed"
+                },
+                {
+                  "name": "Assigned",
+                  "value": "Assigned"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                },
+                {
+                  "name": "In Progress",
+                  "value": "In Progress"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "reminder_count",
+              "displayName": "reminder_count",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "last_reminder_sent",
+              "displayName": "last_reminder_sent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "expiry_date",
+              "displayName": "expiry_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "certificate_id",
+              "displayName": "certificate_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "quiz_submissions",
+              "displayName": "quiz_submissions",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "certificates",
+              "displayName": "certificates",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "quiz_sent",
+              "displayName": "quiz_sent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "quiz_sent_date",
+              "displayName": "quiz_sent_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1632,
+        -512
+      ],
+      "id": "63796b71-0c0c-4ce6-857f-160cb0037f65",
+      "name": "Update sent_quiz",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "0JVatjY9FQ5M8FJn",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "1330374274",
+        "text": "=Flow 2 — Quiz Release + Reminder DAILY REPORT\n\nQuiz Released:\n{{ $json.quiz }}\n\nReminder 1:\n{{ $json.reminder1 }}\n\nReminder 2:\n{{ $json.reminder2 }}\n\nReminder 3:\n{{ $json.reminder3 }}\n\nEscalations:\n{{ $json.escalation }}\n\n--------------------\n\n{{ $json.details }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1408,
+        32
+      ],
+      "id": "e2a1b5fe-da65-4771-bf6e-3064870bf0ba",
+      "name": "Training message",
+      "webhookId": "c744e893-c43e-40ec-863b-6a2c19b6ca51",
+      "credentials": {
+        "telegramApi": {
+          "id": "D7GnYJqDt1SAznXH",
+          "name": "Telegram account chat gen ai"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appe3F0WYpeU6YtKv",
+          "mode": "list",
+          "cachedResultName": "final-proyek-nfa",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl7SGs0G97nyL6na",
+          "mode": "list",
+          "cachedResultName": "training_assignments",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv/tbl7SGs0G97nyL6na"
+        },
+        "filterByFormula": "=OR({status}  = 'Assigned', {status}= 'In Progress')",
+        "options": {
+          "fields": [
+            "assignment_id",
+            "employee_id",
+            "full_name (from employee_id)",
+            "email (from employee_id)",
+            "employee_id (from employee_id)",
+            "module_id",
+            "module_name (from module_id)",
+            "assigned_date",
+            "due_date",
+            "status",
+            "reminder_count",
+            "last_reminder_sent",
+            "quiz_sent",
+            "quiz_sent_date",
+            "quiz_link (from module_id)"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        656,
+        -208
+      ],
+      "id": "b1d12109-c2e8-4c51-a9b8-e7511c35f108",
+      "name": "Get Training Assignments",
+      "executeOnce": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "0JVatjY9FQ5M8FJn",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst stats = {\n  quiz: 0,\n  reminder1: 0,\n  reminder2: 0,\n  reminder3: 0,\n  escalation: 0\n};\n\nconst details = [];\n\nfor (const item of items) {\n\n  switch(item.json.action) {\n\n    case 'send_quiz':\n      stats.quiz++;\n      break;\n\n    case 'reminder_1':\n      stats.reminder1++;\n      break;\n\n    case 'reminder_2':\n      stats.reminder2++;\n      break;\n\n    case 'reminder_3':\n      stats.reminder3++;\n      break;\n\n    case 'escalate':\n      stats.escalation++;\n      break;\n  }\n\n  details.push(\n`• ${item.json.employee_name}\n(${item.json.employee_email})\n→ ${item.json.module_name}\n[${item.json.action}]`\n  );\n}\n\nreturn [{\n  json: {\n    ...stats,\n    total: items.length,\n    details: details.join('\\n\\n')\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        32
+      ],
+      "id": "dea7519d-b995-4866-a361-b55844afebcc",
+      "name": "Code Summary"
+    },
+    {
+      "parameters": {
+        "content": "## Flow 2 — Quiz Release + Reminder",
+        "height": 96,
+        "width": 336,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        496,
+        -384
+      ],
+      "typeVersion": 1,
+      "id": "36e17a65-d722-4a1a-a776-823d29f3b924",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Training Assignments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quiz Release Logic": {
+      "main": [
+        [
+          {
+            "node": "Code Summary",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "quiz email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "reminder email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "reminder email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "reminder email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "escalate email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "escalate email": {
+      "main": [
+        [
+          {
+            "node": "Update status failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "quiz email": {
+      "main": [
+        [
+          {
+            "node": "Update sent_quiz",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "reminder email": {
+      "main": [
+        [
+          {
+            "node": "Update reminder 1/2/3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Training Assignments": {
+      "main": [
+        [
+          {
+            "node": "Quiz Release Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Summary": {
+      "main": [
+        [
+          {
+            "node": "Training message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "73453889-1b73-4c2d-a9ec-e0b491ded2c1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "df546d4de5157fa1c7b69582cb72f6572011a520a5fa57642bdc2e7ce1f74a37"
+  },
+  "nodeGroups": [],
+  "id": "GNnawlcWc7rGKP8Z",
+  "tags": [
+    {
+      "updatedAt": "2026-06-01T10:54:08.345Z",
+      "createdAt": "2026-06-01T10:53:44.118Z",
+      "id": "fH0zJts3HnXNV9yb",
+      "name": "Final Proyek NFA AI"
+    }
+  ]
+}

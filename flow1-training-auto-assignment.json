@@ -1,0 +1,740 @@
+{
+  "name": "FLOW 1 — Training Auto-Assignment",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const employees = $('Get Employees').all();\n\nconst modules = $('Get Modules').all();\n\nconst assignments = $('Get Assignments').all();\n\nconst newAssignments = [];\n\n// ======================\n// FORMAT DATE HUMAN-READABLE\n// ======================\n\nfunction formatDueDate(isoString) {\n  const date = new Date(isoString);\n  \n  // Tambah 7 jam → WIB\n  const wib = new Date(date.getTime() + (7 * 60 * 60 * 1000));\n  \n  const days   = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];\n  const months = ['Januari','Februari','Maret','April','Mei','Juni',\n                  'Juli','Agustus','September','Oktober','November','Desember'];\n  \n  const dayName = days[wib.getUTCDay()];\n  const date_   = wib.getUTCDate();\n  const month   = months[wib.getUTCMonth()];\n  const year    = wib.getUTCFullYear();\n  const hours   = String(wib.getUTCHours()).padStart(2, '0');\n  const minutes = String(wib.getUTCMinutes()).padStart(2, '0');\n  \n  return `${dayName}, ${date_} ${month} ${year} pukul ${hours}:${minutes} WIB`;\n}\n\n// ======================\n// GENERATE NEXT ASN ID\n// ======================\n\n// let assignmentCounter = 1;\n\n// if (assignments.length > 0) {\n\n//     // ambil assignment terakhir\n//     const lastAssignment =\n//         assignments[0].json.fields.assignment_id;\n\n//     // contoh:\n//     // ASN004\n\n//     const lastNumber = parseInt(\n//         lastAssignment.replace('ASN', '')\n//     );\n\n//     assignmentCounter = lastNumber + 1;\n// }\n\n\n// ======================\n// MAIN LOOP\n// ======================\n\nfor (const emp of employees) {\n\n    const employee = emp.json.fields;\n\n    // cari module sesuai role employee\n    const employeeModules = modules.filter(mod => {\n\n        const moduleFields = mod.json.fields;\n\n        return (\n            moduleFields[\"role_name (from mandatory_for_role)\"] &&\n            moduleFields[\"role_name (from mandatory_for_role)\"][0] ===\n            employee[\"role_name (from role_id)\"][0]\n        );\n\n    });\n\n\n    // loop module\n    for (const mod of employeeModules) {\n\n        const moduleFields = mod.json.fields;\n\n        // cek duplicate assignment\n        const alreadyAssigned = assignments.some(assign => {\n\n            const assignFields = assign.json.fields;\n\n            return (\n\n                assignFields[\"employee_id (from employee_id)\"] &&\n                assignFields[\"module_name (from module_id)\"] &&\n\n                assignFields[\"employee_id (from employee_id)\"][0] ===\n                employee.employee_id &&\n\n                assignFields[\"module_name (from module_id)\"][0] ===\n                moduleFields.module_id\n\n            );\n\n        });\n\n\n        // kalau belum ada assignment\n        if (!alreadyAssigned) {\n\n            const now = new Date();\n\n            const due = new Date();\n\n            due.setDate(due.getDate() + 14);\n\n            newAssignments.push({\n\n                json: {\n\n                    // assignment_id: 'ASN' +\n                    //     String(assignmentCounter++)\n                    //     .padStart(3, '0'),\n\n                    employee_id: [\n                        emp.json.id\n                    ],\n\n                    module_id: [\n                        mod.json.id\n                    ],\n\n                    employee_name: employee.full_name,\n\n                    employee_email: employee.email,\n\n                    module_name: moduleFields.module_name,\n                    material_link: moduleFields.material_link,\n                    assigned_date: now.toISOString(),\n\n                    due_date: due.toISOString(),\n                    due_date_display: formatDueDate(due),\n                    assigned_date_display: formatDueDate(now),\n\n                    created_at: now.toISOString(),\n\n                    status: 'Assigned',\n\n                    reminder_count: 0\n                }\n\n            });\n\n        }\n\n    }\n\n}\n\nreturn newAssignments;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1504,
+        80
+      ],
+      "id": "3762d4b6-deda-4090-81e5-24dbdd02093a",
+      "name": "Filtering",
+      "executeOnce": false,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5a2bc5ed-353b-4a94-aa3f-86e89c2bb817",
+              "leftValue": "={{ $json.employee_id !== undefined }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1728,
+        80
+      ],
+      "id": "c491e282-9514-4265-a804-fc2970cd68a1",
+      "name": "Has New Assignments?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];\nconst months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];\n\nconst formatted = `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()} - ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;\n\nreturn { waktu: formatted };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1968,
+        256
+      ],
+      "id": "ab032a02-3d63-457d-ad72-724f31b76997",
+      "name": "Date Format"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        2176,
+        64
+      ],
+      "id": "868fae20-e568-402b-be6a-6de83e183eac",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];\nconst months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];\n\nconst formatter = new Intl.DateTimeFormat(\"id-ID\", {\n  timeZone: \"Asia/Jakarta\",\n  year: \"numeric\",\n  month: \"numeric\",\n  day: \"numeric\",\n  hour: \"2-digit\",\n  minute: \"2-digit\",\n  second: \"2-digit\"\n});\n\nconst parts = formatter.formatToParts(now);\nconst dayName = days[now.getDay()];\nconst date = parts.find(p => p.type === \"day\").value;\nconst month = months[parseInt(parts.find(p => p.type === \"month\").value) - 1];\nconst year = parts.find(p => p.type === \"year\").value;\nconst hour = parts.find(p => p.type === \"hour\").value;\nconst minute = parts.find(p => p.type === \"minute\").value;\nconst second = parts.find(p => p.type === \"second\").value;\n\nconst formatted = `${dayName}, ${date} ${month} ${year} - ${hour}:${minute}:${second} WIB`;\n\nconsole.log(formatted);\n\nconst assignments = $json.data || [];\n\nconst assignmentList = assignments.map(a => {\n  const fields = a.fields;\n\n  const name =\n    fields[\"full_name (from employee_id)\"]?.[0] || \"-\";\n\n  const email =\n    fields[\"email (from employee_id)\"]?.[0] || \"-\";\n\n  const module =\n    fields[\"module_name (from module_id)\"]?.[0] || \"-\";\n\n  return `• ${name}\n  (${email})\n  → ${module}`;\n});\n\nreturn [\n  {\n    json: {\n      total: assignments.length,\n      assignment_list: assignmentList.join('\\n\\n'),\n      waktu: formatted,\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2384,
+        64
+      ],
+      "id": "584ff08b-23b7-4a0f-a2d2-73f86f672ae4",
+      "name": "Build Telegram Summary"
+    },
+    {
+      "parameters": {
+        "chatId": "1330374274",
+        "text": "=FLOW 1 — Training Auto-Assignment\n\nAssignments Created:\n{{ $json.total }}\n\nAssignments:\n\n{{ $json.assignment_list }}\n\nExecution:\n{{ $json.waktu }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2576,
+        64
+      ],
+      "id": "d967de55-1a65-4b57-a8a9-710fe3897cc1",
+      "name": "Training assignment message",
+      "webhookId": "69210c73-4d01-4e38-83a8-73f633e59a3e",
+      "credentials": {
+        "telegramApi": {
+          "id": "D7GnYJqDt1SAznXH",
+          "name": "Telegram account chat gen ai"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "1330374274",
+        "text": "=FLOW 1 — Training Auto-Assignment\n\nTidak ada assignment baru hari ini.\n\nWaktu: {{ $json.waktu }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2192,
+        256
+      ],
+      "id": "5a17b63d-f545-4950-8ae1-eaae1206b7b8",
+      "name": "No training message",
+      "webhookId": "c744e893-c43e-40ec-863b-6a2c19b6ca51",
+      "credentials": {
+        "telegramApi": {
+          "id": "D7GnYJqDt1SAznXH",
+          "name": "Telegram account chat gen ai"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        624,
+        80
+      ],
+      "id": "1bb44733-a260-43e8-b586-3957bbbea0f0",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appe3F0WYpeU6YtKv",
+          "mode": "list",
+          "cachedResultName": "final-proyek-nfa",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblAN1ia3Dbx5gyQq",
+          "mode": "list",
+          "cachedResultName": "employees",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv/tblAN1ia3Dbx5gyQq"
+        },
+        "filterByFormula": "={status}='Active'",
+        "options": {
+          "fields": [
+            "employee_id",
+            "full_name",
+            "email",
+            "role_name (from role_id)",
+            "status",
+            "training_assignments"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        832,
+        80
+      ],
+      "id": "f44c2b45-19e0-460b-915f-bfb7afc2e267",
+      "name": "Get Employees",
+      "executeOnce": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "0JVatjY9FQ5M8FJn",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## FLOW 1 — Training Auto-Assignment",
+        "height": 96,
+        "width": 336,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        640,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "679e26c5-f8de-461d-8619-b8d52b5f4ad5",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Filtering').item.json.employee_email }}",
+        "subject": "=Mandatory Training - {{ $('Filtering').item.json.module_name }}",
+        "message": "=<!DOCTYPE html>\n<html lang=\"id\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Mandatory Training Assignment</title>\n</head>\n<body style=\"margin: 0; padding: 0; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;\">\n\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color: #f8fafc; padding: 40px 16px;\">\n    <tr>\n      <td align=\"center\">\n        \n        <!-- Main Container -->\n        <table width=\"100%\" maxWidth=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;\">\n          \n          <!-- Header/Branding -->\n          <tr>\n            <td style=\"padding: 40px 40px 24px 40px;\">\n              <div style=\"font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;\">Human Resources &amp; Development</div>\n              <h1 style=\"margin: 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;\">Mandatory Training Assignment</h1>\n            </td>\n          </tr>\n\n          <!-- Content Body -->\n          <tr>\n            <td style=\"padding: 0 40px 32px 40px; font-size: 15px; line-height: 1.6; color: #334155;\">\n              <p style=\"margin: 0 0 20px 0;\">Halo <strong>{{ $('Filtering').item.json.employee_name }}</strong>,</p>\n              <p style=\"margin: 0 0 32px 0;\">Anda telah ditugaskan untuk menyelesaikan modul pelatihan wajib di bawah ini. Harap pelajari seluruh materi dalam kurun waktu <strong>7 hari ke depan</strong> sebelum mengikuti sesi penilaian/evaluasi resmi.</p>\n\n              <!-- Metadata Grid -->\n              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-bottom: 32px; border-top: 1px solid #edf2f7; border-bottom: 1px solid #edf2f7; padding: 16px 0;\">\n                <tr>\n                  <td style=\"padding: 8px 0; vertical-align: top; width: 30%;\">\n                    <span style=\"font-size: 13px; color: #64748b; font-weight: 500;\">Nama Modul</span>\n                  </td>\n                  <td style=\"padding: 8px 0; vertical-align: top; font-weight: 600; color: #0f172a;\">\n                    {{ $('Filtering').item.json.module_name }}\n                  </td>\n                </tr>\n                <tr>\n                  <td style=\"padding: 8px 0; vertical-align: top;\">\n                    <span style=\"font-size: 13px; color: #64748b; font-weight: 500;\">Tanggal Mulai</span>\n                  </td>\n                  <td style=\"padding: 8px 0; vertical-align: top; color: #334155;\">\n                    {{ $('Filtering').item.json.assigned_date_display }}\n                  </td>\n                </tr>\n                <tr>\n                  <td style=\"padding: 8px 0; vertical-align: top;\">\n                    <span style=\"font-size: 13px; color: #64748b; font-weight: 500;\">Status</span>\n                  </td>\n                  <td style=\"padding: 8px 0; vertical-align: top; color: #334155;\">\n                    {{ $('Filtering').item.json.status }}\n                  </td>\n                </tr>\n              </table>\n\n              <!-- Button CTA -->\n              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-bottom: 40px;\">\n                <tr>\n                  <td align=\"left\">\n                    <a href=\"{{ $('Filtering').item.json.material_link }}\" style=\"background-color: #0f172a; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;\">\n                      Akses Materi Pelatihan\n                    </a>\n                  </td>\n                </tr>\n              </table>\n\n              <!-- Timeline Section -->\n              <div style=\"border-top: 1px solid #e2e8f0; padding-top: 24px;\">\n                <h2 style=\"margin: 0 0 16px 0; font-size: 14px; font-weight: 600; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em;\">Timeline &amp; Prosedur</h2>\n                \n                <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"font-size: 14px;\">\n                  <tr>\n                    <td style=\"padding: 6px 0; width: 30%; color: #64748b; vertical-align: top;\">Hari ini</td>\n                    <td style=\"padding: 6px 0; color: #334155; vertical-align: top;\">Modul aktif dan materi dapat diakses.</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding: 6px 0; color: #64748b; vertical-align: top;\">Hari ke-7</td>\n                    <td style=\"padding: 6px 0; color: #334155; vertical-align: top;\">Tautan evaluasi/quiz akan otomatis dikirimkan ke email Anda.</td>\n                  </tr>\n                  <tr>\n                    <td style=\"padding: 6px 0; color: #941c1c; font-weight: 600; vertical-align: top;\">{{ $('Filtering').item.json.due_date_display }}</td>\n                    <td style=\"padding: 6px 0; color: #941c1c; font-weight: 600; vertical-align: top;\">Batas akhir pengerjaan evaluasi (Sistem ditutup).</td>\n                  </tr>\n                </table>\n              </div>\n\n              <p style=\"margin: 24px 0 0 0; font-size: 13px; color: #64748b;\">\n                Catatan: Evaluasi akhir hanya dapat diambil satu kali. Pastikan Anda telah meninjau kembali seluruh materi yang diberikan sebelum memulai.\n              </p>\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"background-color: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;\">\n              <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"font-size: 12px; color: #94a3b8; line-height: 1.5;\">\n                <tr>\n                  <td>\n                    Email ini dikirimkan secara otomatis oleh NFA Training &amp; Certification Platform.<br>\n                    Harap tidak membalas email ini secara langsung. Jika ada kendala teknis, hubungi Helpdesk IT atau Admin HR.\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n        </table>\n        \n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1968,
+        -128
+      ],
+      "id": "67c89c56-60c7-47f8-937d-f617a7b6c8fd",
+      "name": "Send Training Assignment Message",
+      "webhookId": "e48976c6-4f46-4510-8ace-43f0b5ab6c8b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yW1I0RUJjy0spB9C",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appe3F0WYpeU6YtKv",
+          "mode": "list",
+          "cachedResultName": "final-proyek-nfa",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblWl8bEB3wMit34E",
+          "mode": "list",
+          "cachedResultName": "training_modules",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv/tblWl8bEB3wMit34E"
+        },
+        "options": {
+          "fields": [
+            "module_id",
+            "module_name",
+            "role_name (from mandatory_for_role)",
+            "material_link"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1056,
+        80
+      ],
+      "id": "7fbabb27-036f-416e-9ec3-0daf8f07e241",
+      "name": "Get Modules",
+      "executeOnce": true,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "0JVatjY9FQ5M8FJn",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appe3F0WYpeU6YtKv",
+          "mode": "list",
+          "cachedResultName": "final-proyek-nfa",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl7SGs0G97nyL6na",
+          "mode": "list",
+          "cachedResultName": "training_assignments",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv/tbl7SGs0G97nyL6na"
+        },
+        "options": {
+          "fields": [
+            "employee_id (from employee_id)",
+            "assignment_id",
+            "module_name (from module_id)"
+          ]
+        },
+        "sort": {
+          "property": [
+            {
+              "field": "assignment_id",
+              "direction": "desc"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1280,
+        80
+      ],
+      "id": "3b878b63-e237-4dbf-8f8e-e77dc86f0858",
+      "name": "Get Assignments",
+      "executeOnce": true,
+      "alwaysOutputData": false,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "0JVatjY9FQ5M8FJn",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appe3F0WYpeU6YtKv",
+          "mode": "list",
+          "cachedResultName": "final-proyek-nfa",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl7SGs0G97nyL6na",
+          "mode": "list",
+          "cachedResultName": "training_assignments",
+          "cachedResultUrl": "https://airtable.com/appe3F0WYpeU6YtKv/tbl7SGs0G97nyL6na"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "={{ $json.status }}",
+            "reminder_count": "={{ $json.reminder_count }}",
+            "module_id": "={{ $json.module_id }}",
+            "assigned_date": "={{ $json.assigned_date }}",
+            "employee_id": "={{ $json.employee_id }}",
+            "created_at": "={{ $json.created_at }}",
+            "due_date": "={{ $json.due_date }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "assignment_id",
+              "displayName": "assignment_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "employee_id (from employee_id)",
+              "displayName": "employee_id (from employee_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "module_id",
+              "displayName": "module_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "module_name (from module_id)",
+              "displayName": "module_name (from module_id)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "assigned_date",
+              "displayName": "assigned_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "due_date",
+              "displayName": "due_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "completion_date",
+              "displayName": "completion_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Completed",
+                  "value": "Completed"
+                },
+                {
+                  "name": "Assigned",
+                  "value": "Assigned"
+                },
+                {
+                  "name": "Failed",
+                  "value": "Failed"
+                },
+                {
+                  "name": "In Progress",
+                  "value": "In Progress"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "reminder_count",
+              "displayName": "reminder_count",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_reminder_sent",
+              "displayName": "last_reminder_sent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "expiry_date",
+              "displayName": "expiry_date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "certificate_id",
+              "displayName": "certificate_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "quiz_submissions",
+              "displayName": "quiz_submissions",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "certificates",
+              "displayName": "certificates",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1968,
+        64
+      ],
+      "id": "e4fb3e62-9e85-4ae1-9111-1186dde7cbe4",
+      "name": "Create Training Assignments",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "0JVatjY9FQ5M8FJn",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Filtering": {
+      "main": [
+        [
+          {
+            "node": "Has New Assignments?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has New Assignments?": {
+      "main": [
+        [
+          {
+            "node": "Create Training Assignments",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Training Assignment Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Date Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date Format": {
+      "main": [
+        [
+          {
+            "node": "No training message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Build Telegram Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Telegram Summary": {
+      "main": [
+        [
+          {
+            "node": "Training assignment message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Employees",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Employees": {
+      "main": [
+        [
+          {
+            "node": "Get Modules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Modules": {
+      "main": [
+        [
+          {
+            "node": "Get Assignments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Assignments": {
+      "main": [
+        [
+          {
+            "node": "Filtering",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Training Assignments": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "eab76fa6-1599-4f1f-997d-2d91ccdcd90c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "df546d4de5157fa1c7b69582cb72f6572011a520a5fa57642bdc2e7ce1f74a37"
+  },
+  "nodeGroups": [],
+  "id": "vZDGG4GT3psk7z5y",
+  "tags": [
+    {
+      "updatedAt": "2026-06-01T10:54:08.345Z",
+      "createdAt": "2026-06-01T10:53:44.118Z",
+      "id": "fH0zJts3HnXNV9yb",
+      "name": "Final Proyek NFA AI"
+    }
+  ]
+}
