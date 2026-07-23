@@ -1,54 +1,258 @@
-# NFA Training & Certification Automation System
+# Employee Training Automation
 
-An end-to-end workflow automation project developed as the final project for the **AI for Business Independent Study Program** at **NF Academy**.
+This branch contains the workflow automation responsible for managing the employee training lifecycle before quiz submission.
 
-This project demonstrates how business processes in employee training and certification can be automated using **n8n**, reducing manual administrative work while improving process consistency and operational efficiency.
+The implementation consists of two integrated workflows:
 
----
+- **Flow 1 – Training Auto Assignment**
+- **Flow 2 – Quiz Release & Reminder**
 
-## Overview
-
-The system automates the complete employee training lifecycle, including:
-
-- Automatic training assignment
-- Learning material distribution
-- Scheduled quiz release
-- Reminder automation
-- Quiz submission processing
-- Certificate generation
-- HR reporting
-
-The implementation is separated into multiple workflows to improve maintainability and scalability.
+Together, these workflows automate the process of assigning mandatory training, distributing learning materials, releasing quizzes, and reminding employees until the assignment reaches completion or expires.
 
 ---
 
-## Repository Structure
+## Workflow Overview
 
 ```
-NFA-Training-Certification-Automation-System
-│
-├── main
-│   └── README.md
-│
-├── training-automation
-│   ├── README.md
-│   ├── flow1-training-auto-assignment.json
-│   └── flow2-quiz-release-reminder.json
-│
-└── quiz-submission
-    ├── README.md
-    └── flow3-quiz-submission.json
+Employees
+      │
+      ▼
+Role Matching
+      │
+      ▼
+Training Assignment
+      │
+      ▼
+Training Email
+      │
+      ▼
+Learning Period (7 Days)
+      │
+      ▼
+Quiz Release
+      │
+      ▼
+Reminder Automation
+      │
+      ▼
+Assignment Completed
+        │
+        ├──────────────► Continue to Quiz Submission Workflow
+        │
+        └──────────────► Overdue → Failed
 ```
 
 ---
 
-## Branches
+# Flow 1 — Training Auto Assignment
 
-| Branch | Description |
-|----------|-------------|
-| `main` | Project overview and repository documentation |
-| `training-automation` | Training Auto-Assignment and Quiz Release & Reminder workflows |
-| `quiz-submission` | Quiz submission processing, certificate generation, and evaluation workflow |
+## Objective
+
+Automatically assign mandatory training modules to employees based on their role while preventing duplicate assignments.
+
+---
+
+## Business Process
+
+1. Retrieve all active employees.
+2. Retrieve all available training modules.
+3. Match employee roles with mandatory training requirements.
+4. Check whether an assignment already exists.
+5. Create a new training assignment.
+6. Send training material via email.
+7. Notify HR with the assignment summary.
+
+---
+
+## Workflow
+
+```
+Cron Trigger
+      │
+      ▼
+Get Active Employees
+      │
+      ▼
+Get Training Modules
+      │
+      ▼
+Role Matching
+      │
+      ▼
+Assignment Exists?
+      │
+      ├── Yes ─────────► Skip
+      │
+      └── No
+            │
+            ▼
+Create Assignment
+            │
+            ▼
+Send Training Email
+            │
+            ▼
+Notify HR
+```
+
+---
+
+## Functional Requirements
+
+| ID | Description |
+|----|-------------|
+| FR-1 | Retrieve active employees from the Employees table. |
+| FR-2 | Retrieve available training modules. |
+| FR-3 | Match employee roles with mandatory training requirements. |
+| FR-4 | Prevent duplicate assignments. |
+| FR-5 | Create a new training assignment record. |
+| FR-6 | Send training assignment email. |
+| FR-7 | Notify HR after assignment creation. |
+
+---
+
+## Assignment Data
+
+Each assignment stores the following information.
+
+| Field |
+|-------|
+| assignment_id |
+| employee_id |
+| module_id |
+| assigned_date |
+| due_date |
+| status |
+| reminder_count |
+
+---
+
+## Output
+
+### Employee Email
+
+Includes:
+
+- Training module
+- Learning material
+- Due date
+
+### HR Notification
+
+Contains a summary of newly assigned training.
+
+---
+
+# Flow 2 — Quiz Release & Reminder
+
+## Objective
+
+Automatically release quizzes after the learning period and manage reminder notifications until the assignment is completed or overdue.
+
+---
+
+## Business Process
+
+1. Check all active assignments.
+2. Wait until the learning period reaches seven days.
+3. Release the quiz.
+4. Update assignment status.
+5. Send reminder emails if the quiz has not been completed.
+6. Escalate overdue assignments to HR.
+
+---
+
+## Workflow
+
+```
+Cron Trigger
+      │
+      ▼
+Get Active Assignments
+      │
+      ▼
+Learning Period Complete?
+      │
+      ├── No ─────────► End
+      │
+      └── Yes
+            │
+            ▼
+Release Quiz
+            │
+            ▼
+Update Status
+            │
+            ▼
+Reminder Engine
+            │
+            ├── Reminder 1
+            ├── Reminder 2
+            ├── Reminder 3
+            │
+            ▼
+Due Date Passed?
+            │
+            ├── No ─────► End
+            │
+            └── Yes
+                  │
+                  ▼
+Escalate to HR
+                  │
+                  ▼
+Update Status = Failed
+```
+
+---
+
+## Reminder Schedule
+
+| Reminder | Condition |
+|-----------|-----------|
+| Reminder 1 | 3 days after quiz release |
+| Reminder 2 | 5 days after quiz release |
+| Reminder 3 | 1 day before due date |
+
+---
+
+## Assignment Status
+
+```
+Assigned
+      │
+      ▼
+In Progress
+      │
+      ├────────► Completed
+      │
+      └────────► Failed
+```
+
+---
+
+## Functional Requirements
+
+| ID | Description |
+|----|-------------|
+| FR-8 | Release quizzes after the learning period. |
+| FR-9 | Update assignment status to **In Progress**. |
+| FR-10 | Send Reminder 1. |
+| FR-11 | Send Reminder 2. |
+| FR-12 | Send Reminder 3. |
+| FR-13 | Escalate overdue assignments to HR. |
+| FR-14 | Mark overdue assignments as **Failed**. |
+
+---
+
+## Reminder State
+
+| Value | Description |
+|-------|-------------|
+| 0 | No reminder sent |
+| 1 | Reminder 1 |
+| 2 | Reminder 2 |
+| 3 | Final reminder |
 
 ---
 
@@ -56,61 +260,28 @@ NFA-Training-Certification-Automation-System
 
 | Category | Technology |
 |----------|------------|
-| Workflow Automation | n8n |
-| Database | Airtable |
-| Form Submission | Tally |
-| Document Generation | PDFMonkey |
-| Notification | Email |
-| Notification | Telegram |
-| Reporting | PDF |
+| Workflow Engine | n8n |
+| Database | Supabase |
+| Email | SMTP |
+| Scheduling | Cron |
+| Reporting | Email Summary |
 
 ---
 
-## Workflow Summary
+## Repository Structure
 
-### Training Automation
-
-Automates employee training assignments based on role, distributes learning materials, releases quizzes, and manages reminder notifications until completion.
-
-### Quiz Submission
-
-Processes quiz submissions, validates scores, updates training status, generates completion certificates, and delivers evaluation results automatically.
-
----
-
-## Key Features
-
-- Automated employee training assignment
-- Scheduled quiz distribution
-- Reminder workflow
-- Quiz evaluation
-- Automatic certificate generation
-- HR reporting
-- Workflow orchestration using n8n
-- Database integration with Airtable
+```
+training-automation
+│
+├── README.md
+├── flow1-training-auto-assignment.json
+└── flow2-quiz-release-reminder.json
+```
 
 ---
 
-## Project Goals
+## Notes
 
-- Reduce repetitive administrative tasks
-- Standardize employee training processes
-- Improve monitoring and reporting
-- Increase workflow reliability through automation
-- Demonstrate practical implementation of business process automation
+This branch covers the automation process from employee assignment until quiz availability.
 
----
-
-## License
-
-This repository was developed for educational and portfolio purposes as part of the **AI for Business Independent Study Program** at **NF Academy**.
-
----
-
-## Author
-
-**Ryandra Athaya Saleh**
-
-Software Engineering Student
-
-Backend Development • Workflow Automation • Business Process Automation
+The final evaluation process, certificate generation, and quiz submission handling are implemented separately in the **quiz-submission** branch.
